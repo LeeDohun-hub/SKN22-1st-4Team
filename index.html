@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>리콜 프로필 분석 (Lemon Scanner v2)</title>
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <style>
+        /* 탭 UI 스타일 */
+        .tab-button {
+            @apply px-5 py-3 text-lg font-medium text-gray-500 border-b-4 border-transparent transition;
+        }
+        .tab-button.active {
+            @apply text-blue-600 border-blue-600;
+        }
+        .tab-content {
+            display: none; /* 기본 숨김 */
+        }
+        .tab-content.active {
+            display: block; /* 활성 탭만 보임 */
+        }
+
+        /* [기능 1] 리콜 프로필 스타일 */
+        .profile-stat {
+            @apply flex justify-between items-center py-3 px-4 border-b;
+        }
+        .profile-stat-label {
+            @apply text-sm font-medium text-gray-600;
+        }
+        .profile-stat-value {
+            @apply text-lg font-bold text-gray-900;
+        }
+        /* [기능 1] 확인필요 리콜 (전문적인 경고) */
+        .profile-stat-danger {
+            @apply text-red-700;
+        }
+
+        /* [기능 2] 키워드 태그 스타일 */
+        .keyword-tag {
+            @apply inline-block bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full mr-1 mb-1;
+        }
+
+        /* [기능 3] 상세 리콜 테이블 (전문적인 경고) */
+        .rate-danger {
+            @apply text-red-700 font-bold;
+        }
+        .rate-warning {
+            @apply text-yellow-600 font-bold;
+        }
+        .rate-safe {
+            @apply text-green-700;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center mb-6">
+            <h1 class="text-4xl font-bold text-blue-800">🚗 중고차 리콜 프로필 분석</h1>
+            <p class="text-lg text-gray-600 mt-2">구매 전, 객관적인 리콜 데이터를 확인하세요.</p>
+        </header>
+
+        <!-- [탭 버튼 영역] -->
+        <div class="mb-6 border-b border-gray-300 flex justify-center space-x-4">
+            <button class="tab-button active" data-tab="search">🔍 리콜 프로필 검색</button>
+            <button class="tab-button" data-tab="compare">⚖️ 모델 비교 (A vs B)</button>
+            <button class="tab-button" data-tab="about">ℹ️ 서비스 소개</button>
+        </div>
+
+        <!-- 1. [리콜 프로필 검색] 탭 -->
+        <div id="tab-search" class="tab-content active">
+            <div class="flex flex-col lg:flex-row gap-6">
+                
+                <!-- 사이드바: 검색 필터 -->
+                <aside class="lg:w-1/3 w-full bg-white p-6 rounded-lg shadow-md h-full sticky top-4">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">🔍 검색 조건</h2>
+                    
+                    <div class="mb-4">
+                        <label for="brand-select" class="block text-sm font-bold text-gray-700 mb-1">1. 제조사</label>
+                        <select id="brand-select" class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- 제조사 선택 --</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="model-select" class="block text-sm font-bold text-gray-700 mb-1">2. 차종</label>
+                        <select id="model-select" class="w-full p-2 border border-gray-300 rounded-md bg-gray-100" disabled>
+                            <option value="">-- 제조사를 먼저 선택 --</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-gray-700 mb-1">3. 리콜 연도 (개시일)</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="year-start" class="w-full p-2 border rounded-md text-center" value="2018">
+                            <span class="text-gray-500">~</span>
+                            <input type="number" id="year-end" class="w-full p-2 border rounded-md text-center" value="2024">
+                        </div>
+                    </div>
+                    
+                    <button id="search-button" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-bold hover:bg-blue-700 transition shadow-lg transform active:scale-95">
+                        리콜 프로필 생성
+                    </button>
+                </aside>
+
+                <!-- 메인 콘텐츠: 리콜 프로필 + 상세 내역 -->
+                <main class="lg:w-2/3 w-full space-y-6">
+                    
+                    <!-- [기능 1] 리콜 프로필 (객관적 팩트) -->
+                    <section class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">📄 리콜 프로필</h2>
+                        <div id="profile-box" class="bg-gray-50 rounded-lg border border-gray-200">
+                            <div class="text-center py-12 text-gray-500">
+                                <p>차량을 선택하고 '프로필 생성' 버튼을 누르세요.</p>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <!-- [기능 2] 상세 리콜 내역 -->
+                    <section class="bg-white p-6 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">📋 상세 리콜 내역</h2>
+                        <div id="results-container" class="overflow-x-auto">
+                            <p class="text-gray-500 text-center py-4">프로필 생성 시 상세 내역이 여기에 표시됩니다.</p>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </div>
+
+        <!-- 2. [모델 비교] 탭 -->
+        <div id="tab-compare" class="tab-content">
+            <div class="bg-white p-8 rounded-lg shadow-md">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2 text-center">⚖️ 경쟁 모델 리콜 프로필 비교</h2>
+                <p class="text-center text-gray-600 mb-8">구매를 망설이는 두 차량의 리콜 이력을 객관적으로 비교합니다.</p>
+                
+                <!-- 비교 선택기 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <!-- 모델 A 선택 -->
+                    <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-xl font-semibold text-blue-700 mb-4 text-center">Model A (비교 대상 1)</h3>
+                        <div class="mb-4">
+                            <label for="brand-a-select" class="block text-sm font-bold text-gray-700 mb-1">제조사</label>
+                            <select id="brand-a-select" class="w-full p-2 border border-gray-300 rounded-md">
+                                <option value="">-- 제조사 선택 --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="model-a-select" class="block text-sm font-bold text-gray-700 mb-1">차종</label>
+                            <select id="model-a-select" class="w-full p-2 border border-gray-300 rounded-md bg-gray-100" disabled>
+                                <option value="">-- 제조사 먼저 --</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 모델 B 선택 -->
+                    <div class="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-xl font-semibold text-green-700 mb-4 text-center">Model B (비교 대상 2)</h3>
+                        <div class="mb-4">
+                            <label for="brand-b-select" class="block text-sm font-bold text-gray-700 mb-1">제조사</label>
+                            <select id="brand-b-select" class="w-full p-2 border border-gray-300 rounded-md">
+                                <option value="">-- 제조사 선택 --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="model-b-select" class="block text-sm font-bold text-gray-700 mb-1">차종</label>
+                            <select id="model-b-select" class="w-full p-2 border border-gray-300 rounded-md bg-gray-100" disabled>
+                                <option value="">-- 제조사 먼저 --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mb-8">
+                    <button id="compare-button" class="bg-green-600 text-white py-3 px-8 rounded-md font-bold text-lg hover:bg-green-700 transition shadow-lg transform active:scale-95">
+                        비교 결과 보기
+                    </button>
+                </div>
+                
+                <!-- 비교 결과 테이블 -->
+                <div id="compare-results" class="overflow-x-auto">
+                    <!-- 비교 결과가 여기에 동적으로 생성됩니다 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. [서비스 소개] 탭 -->
+        <div id="tab-about" class="tab-content bg-white p-8 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">ℹ️ 이 서비스에 대하여</h2>
+            <div class="space-y-4 text-gray-700 leading-relaxed">
+                <p>
+                    '중고차 리콜 프로필 분석' 서비스는 중고차 구매 시 가장 확인하기 어려운 **'리콜 이력'**과 **'실제 시정 여부'**를
+                    객관적인 데이터로 분석하여 제공합니다.
+                </p>
+                <p>
+                    단순히 "리콜이 있었다"는 사실을 넘어, 해당 리콜이 얼마나 **'치명적인 결함(키워드)'**과 관련 있는지,
+                    그리고 리콜 대상 차량 중 **'몇 퍼센트가 실제로 수리(시정률)'**되었는지에 대한
+                    '팩트'에 기반한 프로필을 제공하여 현명한 구매 결정을 돕습니다.
+                </p>
+            </div>
+            <h3 class="text-xl font-semibold text-gray-700 mt-8 mb-2">📊 데이터 출처</h3>
+            <p class="text-gray-700">이 서비스는 <strong>한국교통안전공단(KOTSA) 자동차 리콜 센터</strong>의 공공데이터를 기반으로 합니다.</p>
+        </div>
+    </div>
+
+    <script>
+        // -------------------------------------------------------------------
+        // [백엔드 시뮬레이션: Mock Data]
+        // -------------------------------------------------------------------
+        
+        const MOCK_BRANDS = [
+            { brand_id: 1, brand_name: '현대' },
+            { brand_id: 2, brand_name: '기아' },
+            { brand_id: 3, brand_name: 'GM' },
+            { brand_id: 4, brand_name: '르노' },
+            { brand_id: 5, brand_name: '벤츠' },
+            { brand_id: 6, brand_name: 'BMW' },
+        ];
+
+        const MOCK_MODELS = {
+            1: [ // 현대
+                { model_id: 101, model_name: '쏘나타 (DN8)' },
+                { model_id: 102, model_name: '아반떼 (CN7)' },
+                { model_id: 103, model_name: '그랜저 (IG)' },
+            ],
+            2: [ // 기아
+                { model_id: 201, model_name: 'K5 (DL3)' },
+                { model_id: 202, model_name: 'K8 (GL3)' },
+                { model_id: 203, model_name: '스포티지 (NQ5)' },
+            ],
+            // ... (다른 브랜드 모델들)
+        };
+        
+        // 상세 리콜 내역 데이터 (프로필 계산의 근거)
+        const MOCK_RECALL_RESULTS = [
+            // 쏘나타 (DN8) - model_id: 101
+            { model_id: 101, brand_name: '현대', model_name: '쏘나타 (DN8)', recall_date: '2023-01-05', reason: '엔진 관련 부품(커넥팅 로드)의 결함으로 주행 중 시동이 꺼질 가능성.', keywords: ['엔진', '시동'], correction_rate: 30.5 },
+            { model_id: 101, brand_name: '현대', model_name: '쏘나타 (DN8)', recall_date: '2022-06-15', reason: '브레이크 잠김 방지(ABS) 시스템의 소프트웨어 오류로 제동 거리가 길어짐.', keywords: ['브레이크', '소프트웨어'], correction_rate: 95.8 },
+            { model_id: 101, brand_name: '현대', model_name: '쏘나타 (DN8)', recall_date: '2021-11-10', reason: '에어백 제어 장치(ACU) 결함으로 충돌 시 에어백이 전개되지 않을 위험.', keywords: ['에어백'], correction_rate: 45.2 },
+            
+            // K5 (DL3) - model_id: 201
+            { model_id: 201, brand_name: '기아', model_name: 'K5 (DL3)', recall_date: '2023-05-20', reason: '연료 펌프 내부 부품 마모로 인한 연료 공급 불량 및 시동 꺼짐 가능성.', keywords: ['엔진', '누유', '시동'], correction_rate: 75.5 },
+            { model_id: 201, brand_name: '기아', model_name: 'K5 (DL3)', recall_date: '2022-08-10', reason: '전자식 변속 제어장치(SCU) 소프트웨어 오류로 주차 시 차량 밀림 현상.', keywords: ['소프트웨어'], correction_rate: 98.0 },
+            { model_id: 201, brand_name: '기아', model_name: 'K5 (DL3)', recall_date: '2021-05-03', reason: '연료 누유 가능성', keywords: ['누유'], correction_rate: 85.0 },
+
+            // 그랜저 (IG) - model_id: 103
+            { model_id: 103, brand_name: '현대', model_name: '그랜저 (IG)', recall_date: '2022-01-01', reason: '배터리 관리 시스템(BMS) 오류로 화재 발생 가능성.', keywords: ['배터리', '화재'], correction_rate: 100.0 },
+        ];
+
+
+        // -------------------------------------------------------------------
+        // [프론트엔드 로직: JavaScript]
+        // -------------------------------------------------------------------
+        
+        $(document).ready(function() {
+            
+            // --- [핵심 백엔드 함수] 리콜 프로필 생성 (시뮬레이션) ---
+            function generateRecallProfile(modelId) {
+                if (!modelId) return null;
+                
+                // 1. 해당 모델의 리콜 내역 필터링
+                const recalls = MOCK_RECALL_RESULTS.filter(r => r.model_id.toString() === modelId.toString());
+                
+                if (recalls.length === 0) {
+                    return { total: 0, keywords: [], avgRate: 'N/A', toCheck: 0 };
+                }
+                
+                let totalRate = 0;
+                let toCheck = 0;
+                const keywords = new Set();
+                
+                // 2. 데이터 집계
+                recalls.forEach(r => {
+                    totalRate += r.correction_rate;
+                    if (r.correction_rate < 50) {
+                        toCheck++; // 시정률 50% 미만 건수
+                    }
+                    r.keywords.forEach(k => keywords.add(k));
+                });
+                
+                // 3. 팩트 계산
+                const avgRate = (totalRate / recalls.length).toFixed(1);
+                
+                // 4. 객관적인 팩트 프로필 반환
+                return {
+                    total: recalls.length,
+                    keywords: Array.from(keywords),
+                    avgRate: avgRate,
+                    toCheck: toCheck
+                };
+            }
+
+            // --- 1. 초기화 함수 ---
+            
+            // 공통: 브랜드 목록 채우기 (A, B, Search 탭 모두)
+            function populateBrands() {
+                let options = '<option value="">-- 제조사 선택 --</option>';
+                MOCK_BRANDS.forEach(brand => {
+                    options += `<option value="${brand.brand_id}">${brand.brand_name}</option>`;
+                });
+                $('#brand-select, #brand-a-select, #brand-b-select').html(options);
+            }
+
+            // 공통: 모델 목록 채우기 (A, B, Search 탭 모두)
+            function populateModels(brandId, $modelSelect) {
+                $modelSelect.empty().append('<option value="">-- 차종 선택 --</option>');
+                
+                if (brandId && MOCK_MODELS[brandId]) {
+                    const models = MOCK_MODELS[brandId];
+                    models.forEach(model => {
+                        $modelSelect.append(`<option value="${model.model_id}">${model.model_name}</option>`);
+                    });
+                    $modelSelect.prop('disabled', false).removeClass('bg-gray-100').addClass('bg-white');
+                } else {
+                    $modelSelect.prop('disabled', true).addClass('bg-gray-100').removeClass('bg-white');
+                    $modelSelect.html('<option value="">-- 제조사를 먼저 선택 --</option>');
+                }
+            }
+
+            // 페이지 로드 시
+            populateBrands();
+
+            // --- 2. 렌더링 함수 (HTML 생성) ---
+
+            // [기능 1] 리콜 프로필 박스 렌더링
+            function renderProfileBox(profile, modelName) {
+                const $box = $('#profile-box');
+                if (!profile) {
+                    $box.html('<div class="text-center py-12 text-gray-500"><p>차량을 선택하고 \'프로필 생성\' 버튼을 누르세요.</p></div>');
+                    return;
+                }
+                
+                let keywordTags = '<span class="text-gray-500">N/A</span>';
+                if (profile.keywords.length > 0) {
+                    keywordTags = profile.keywords.map(k => `<span class="keyword-tag">#${k}</span>`).join(' ');
+                }
+
+                // [중요] '확인필요 리콜'에 전문적인 경고 스타일 적용
+                let toCheckClass = profile.toCheck > 0 ? 'profile-stat-danger' : '';
+
+                $box.html(`
+                    <h3 class="text-xl font-bold text-gray-800 p-4 border-b">${modelName}</h3>
+                    <div class="profile-stat">
+                        <span class="profile-stat-label">누적 리콜 건수</span>
+                        <span class="profile-stat-value">${profile.total} 건</span>
+                    </div>
+                    <div class="profile-stat">
+                        <span class="profile-stat-label">평균 시정률</span>
+                        <span class="profile-stat-value">${profile.avgRate}%</span>
+                    </div>
+                    <div class="profile-stat">
+                        <span class="profile-stat-label">확인필요 리콜 (시정률 50%↓)</span>
+                        <span class="profile-stat-value ${toCheckClass}">${profile.toCheck} 건</span>
+                    </div>
+                    <div class="p-4">
+                        <span class="profile-stat-label">주요 결함 키워드</span>
+                        <div class="mt-2">${keywordTags}</div>
+                    </div>
+                `);
+            }
+            
+            // [기능 2] 상세 리콜 테이블 렌더링
+            function renderResultsTable(modelId) {
+                const $container = $('#results-container');
+                const recalls = MOCK_RECALL_RESULTS.filter(r => r.model_id.toString() === modelId.toString());
+
+                if (recalls.length === 0) {
+                    $container.html('<p class="text-gray-500 text-center py-4">상세 리콜 내역이 없습니다.</p>');
+                    return;
+                }
+
+                let html = `
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase w-3/5">리콜 사유</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase w-1/5">개시일</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase w-1/5">시정률</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                `;
+
+                recalls.forEach(row => {
+                    let rate = parseFloat(row.correction_rate);
+                    let rateClass = 'rate-safe'; // 80% 이상
+                    if (rate < 50) rateClass = 'rate-danger';
+                    else if (rate < 80) rateClass = 'rate-warning';
+
+                    html += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-4 align-top">
+                                <p class="text-sm text-gray-900" style="white-space: normal;">${row.reason}</p>
+                            </td>
+                            <td class="px-4 py-4 align-top text-sm text-gray-500">${row.recall_date}</td>
+                            <td class="px-4 py-4 align-top text-sm ${rateClass}">${rate}%</td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                $container.html(html);
+            }
+
+            // [기능 3] A vs B 비교 테이블 렌더링
+            function renderCompareTable(profileA, modelAName, profileB, modelBName) {
+                const $container = $('#compare-results');
+                
+                if (!profileA || !profileB) {
+                     $container.html('<p class="text-gray-500 text-center py-4">비교할 두 모델을 모두 선택해주세요.</p>');
+                    return;
+                }
+                
+                function getStatHtml(profile) {
+                    let keywords = profile.keywords.length > 0 ? profile.keywords.map(k => `<span class="keyword-tag">#${k}</span>`).join(' ') : 'N/A';
+                    let toCheckClass = profile.toCheck > 0 ? 'profile-stat-danger' : '';
+                    return `
+                        <td class="p-4 text-center">
+                            <span class="profile-stat-value">${profile.total} 건</span>
+                        </td>
+                        <td class="p-4">${keywords}</td>
+                        <td class="p-4 text-center">
+                            <span class="profile-stat-value">${profile.avgRate}%</span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="profile-stat-value ${toCheckClass}">${profile.toCheck} 건</span>
+                        </td>
+                    `;
+                }
+
+                let html = `
+                    <table class="min-w-full divide-y divide-gray-200 border">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase">비교 항목</th>
+                                <th class="px-4 py-3 text-center text-xs font-bold text-blue-700 uppercase">${modelAName}</th>
+                                <th class="px-4 py-3 text-center text-xs font-bold text-green-700 uppercase">${modelBName}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-4 py-4 font-medium">누적 리콜 건수</td>
+                                ${getStatHtml(profileA).split('</td>').slice(0, 1).join('</td>') + '</td>'}
+                                ${getStatHtml(profileB).split('</td>').slice(0, 1).join('</td>') + '</td>'}
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-4 font-medium">주요 결함 키워드</td>
+                                ${getStatHtml(profileA).split('</td>').slice(1, 2).join('</td>') + '</td>'}
+                                ${getStatHtml(profileB).split('</td>').slice(1, 2).join('</td>') + '</td>'}
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-4 font-medium">평균 시정률</td>
+                                ${getStatHtml(profileA).split('</td>').slice(2, 3).join('</td>') + '</td>'}
+                                ${getStatHtml(profileB).split('</td>').slice(2, 3).join('</td>') + '</td>'}
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-4 font-medium">확인필요 리콜 (50%↓)</td>
+                                ${getStatHtml(profileA).split('</td>').slice(3, 4).join('</td>') + '</td>'}
+                                ${getStatHtml(profileB).split('</td>').slice(3, 4).join('</td>') + '</td>'}
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+                $container.html(html);
+            }
+
+            // --- 3. 이벤트 핸들러 바인딩 ---
+
+            // 탭 클릭
+            $('.tab-button').on('click', function() {
+                const tabId = $(this).data('tab');
+                $('.tab-button').removeClass('active');
+                $(this).addClass('active');
+                $('.tab-content').removeClass('active');
+                $('#tab-' + tabId).addClass('active');
+            });
+
+            // [검색 탭] 브랜드 선택
+            $('#brand-select').on('change', function() {
+                populateModels($(this).val(), $('#model-select'));
+            });
+
+            // [검색 탭] '프로필 생성' 버튼 클릭
+            $('#search-button').on('click', function() {
+                const modelId = $('#model-select').val();
+                const modelName = $('#model-select option:selected').text();
+                
+                if (!modelId) {
+                    alert("제조사와 차종을 모두 선택해주세요.");
+                    return;
+                }
+
+                // 1. 프로필 생성 및 렌더링
+                const profile = generateRecallProfile(modelId);
+                renderProfileBox(profile, modelName);
+                
+                // 2. 상세 내역 테이블 렌더링
+                renderResultsTable(modelId);
+            });
+
+            // [비교 탭] 브랜드 A 선택
+            $('#brand-a-select').on('change', function() {
+                populateModels($(this).val(), $('#model-a-select'));
+            });
+
+            // [비교 탭] 브랜드 B 선택
+            $('#brand-b-select').on('change', function() {
+                populateModels($(this).val(), $('#model-b-select'));
+            });
+
+            // [비교 탭] '비교 결과 보기' 버튼 클릭
+            $('#compare-button').on('click', function() {
+                const modelAId = $('#model-a-select').val();
+                const modelBId = $('#model-b-select').val();
+                const modelAName = $('#model-a-select option:selected').text();
+                const modelBName = $('#model-b-select option:selected').text();
+
+                if (!modelAId || !modelBId) {
+                    alert("비교할 두 모델을 모두 선택해주세요.");
+                    return;
+                }
+
+                const profileA = generateRecallProfile(modelAId);
+                const profileB = generateRecallProfile(modelBId);
+                
+                renderCompareTable(profileA, modelAName, profileB, modelBName);
+            });
+
+        });
+    </script>
+
+</body>
+</html>
