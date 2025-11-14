@@ -1,3 +1,4 @@
+# 파일 이름: Home.py
 import streamlit as st
 import time 
 
@@ -18,10 +19,11 @@ def display_custom_header():
     """
 
     # (파일 이름 대신, 사이드바의 '순서'를 기준으로 마지막 2개 항목을 숨깁니다.)
+    # (pages/ 폴더에 7개 파일이 있으므로, 6번, 7번을 숨깁니다)
     st.markdown("""
     <style>
-    [data-testid="stSidebarNav"] ul > li:nth-last-child(1), /* 마지막 항목 (9번) */
-    [data-testid="stSidebarNav"] ul > li:nth-last-child(2)  /* 마지막에서 2번째 항목 (8번) */
+    [data-testid="stSidebarNav"] ul > li:nth-last-child(1), /* 7_⚙️_마이페이지.py */
+    [data-testid="stSidebarNav"] ul > li:nth-last-child(2)  /* 6_✍️_회원가입.py */
     {
         display: none;
     }
@@ -41,10 +43,12 @@ def display_custom_header():
         with col1:
             st.empty() # 왼쪽을 비워둠
         with col2:
-            if st.button("⚙️ 마이페이지", use_container_width=True):
-                st.switch_page("pages/_9_⚙️_마이페이지.py")
+            # [오류 수정] key 추가
+            if st.button("⚙️ 마이페이지", use_container_width=True, key="header_mypage"):
+               st.switch_page("pages/7_⚙️_마이페이지.py")
         with col3:
-            if st.button("🚪 로그아웃", use_container_width=True):
+            # [오류 수정] key 추가
+            if st.button("🚪 로그아웃", use_container_width=True, key="header_logout"):
                 st.session_state.logged_in = False
                 if 'user_email' in st.session_state: del st.session_state.user_email
                 if 'user_name' in st.session_state: del st.session_state.user_name
@@ -59,11 +63,13 @@ def display_custom_header():
         with col1:
             st.empty() # 왼쪽을 비워둠
         with col2:
-            if st.button("🔑 로그인", use_container_width=True):
-                st.rerun() 
+            # [★ 2차 수정] st.rerun() -> st.switch_page("Home.py")
+            if st.button("🔑 로그인", use_container_width=True, key="header_login"):
+               st.switch_page("Home.py")
         with col3:
-            if st.button("✍️ 회원가입", use_container_width=True):
-                st.switch_page("pages/_8_✍️_회원가입.py")
+            # [오류 수정] key 추가
+            if st.button("✍️ 회원가입", use_container_width=True, key="header_signup"):
+               st.switch_page("pages/6_✍️_회원가입.py")
     
     st.divider() # 헤더와 본문 구분선
 
@@ -147,7 +153,7 @@ st.markdown(
     - **(조치)** 예약된 날짜에 방문하여 **무상**으로 점검 및 수리 진행
     
     **3. 리콜 vs 무상수리 차이점**
-    - **리콜 (강제/자발적)**: 안전 운행에 **중대한 지장**을 주는 결함 (예: 화재, 시동 꺼짐, 브레이크). 법적 의무이며 시정 기간(1년 6개월이 정해져 있음.
+    - **리콜 (강제/자발적)**: 안전 운행에 **중대한 지장**을 주는 결함 (예: 화재, 시동 꺼짐, 브레이크). 법적 의무이며 시정 기간(1년 6개월)이 정해져 있음.
     - **무상수리**: 안전과 **직접 관련 없는** 결함 (예: 소음, 부품 내구성). 제조사가 고객 만족을 위해 자발적으로 제공.
     """
 )
@@ -155,7 +161,6 @@ st.markdown("---")
 
 st.header("🔗 관련 사이트 링크")
 tip_col1, tip_col2, tip_col3, tip_col4 = st.columns(4)
-# (이하 관련 사이트 링크 코드는 동일하므로 생략)
 
 with tip_col1:
     with st.container(border=True):

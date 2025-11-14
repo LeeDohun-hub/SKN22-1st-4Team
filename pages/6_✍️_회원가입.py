@@ -3,10 +3,18 @@ import streamlit as st
 import re
 import time
 from backend.db_manager import create_connection
+try:
+    from Home import display_custom_header
+except ImportError:
+    # (Home.py가 없는 경우를 대비한 예외 처리)
+    def display_custom_header():
+        pass 
 
 # 페이지 설정
 st.set_page_config(page_title="회원가입", page_icon="✍️")
 st.title("✍️ Lemon Scanner 회원가입")
+
+display_custom_header()
 
 # --- 유효성 검사 함수 ---
 def is_valid_email(email):

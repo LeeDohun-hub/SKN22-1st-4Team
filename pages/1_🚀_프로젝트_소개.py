@@ -1,6 +1,11 @@
 import streamlit as st
 
-from Home import display_custom_header 
+try:
+    from Home import display_custom_header
+except ImportError:
+    # (Home.py가 없는 경우를 대비한 예외 처리)
+    def display_custom_header():
+        pass 
 
 # --- 페이지 기본 설정 ---
 st.set_page_config(

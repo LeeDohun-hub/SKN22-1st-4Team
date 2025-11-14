@@ -1,9 +1,17 @@
 # pages/_9_⚙️_마이페이지.py
 import streamlit as st
-import time 
+import time
+try:
+    from Home import display_custom_header
+except ImportError:
+    # (Home.py가 없는 경우를 대비한 예외 처리)
+    def display_custom_header():
+        pass 
 
 st.set_page_config(page_title="마이페이지", page_icon="⚙️", layout="wide")
 st.title("⚙️ 마이페이지")
+
+display_custom_header()
 
 # --- 1. 로그인 확인 ---
 if 'logged_in' not in st.session_state or not st.session_state['logged_in']:
