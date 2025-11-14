@@ -1,15 +1,22 @@
+# 파일 이름: 2_🍋_상세_검색.py
 import streamlit as st
 import pandas as pd
-import datetime      
-from Home import display_custom_header 
-
+import datetime       
 from backend.search_queries import (
     get_all_keywords_with_desc, 
     get_all_brands, 
     get_models_by_brand, 
-    search_recalls
+    search_recalls,
+    get_keywords_for_recall
 )
 from backend.stats_queries import get_summary_stats
+
+try:
+    from Home import display_custom_header
+except ImportError:
+    # (Home.py가 없는 경우를 대비한 예외 처리)
+    def display_custom_header():
+        pass 
 
 # --- [0] 페이지 기본 설정 ---
 st.set_page_config(
@@ -20,11 +27,9 @@ st.set_page_config(
 
 display_custom_header()
 
-# --- [1A] Session State 초기화 ---
+# --- [1A] (수정) Session State 초기화 ---
 if "search_results" not in st.session_state:
     st.session_state.search_results = pd.DataFrame() 
-if "search_results_df" not in st.session_state:
-    st.session_state.search_results_df = {"selection": {"rows": []}}
 
 # --- [1B] 키워드 설명 DB에서 로드 ---
 try:
@@ -104,8 +109,7 @@ else:
         }
     )
     
-    # --- [6] (수정) 클릭 이벤트 처리 로직 ---
-    
+    # --- [6] 클릭 이벤트 처리 로직 ---
     selection = st.session_state.get("search_results_df", {}).get("selection", {})
     
     if selection.get("rows"):
@@ -115,17 +119,14 @@ else:
             selected_reason = selected_row['리콜사유']
 
             st.markdown("---")
-            
             st.subheader(f"🔍 선택된 리콜 상세") 
-            
             st.markdown(f"**전체 리콜 사유:**")
             st.info(selected_reason) 
-      
+        
         except IndexError:
             pass
         except Exception as e:
             st.error(f"선택 항목을 처리하는 중 오류 발생: {e}")
-
 
 # --- [7] 데이터 기준 기간 표시 ---
 try:
